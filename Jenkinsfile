@@ -6,10 +6,10 @@ pipeline {
   }
 
   environment {
-    IMAGE_NAME = "kubernetes-demo"              // Application name
-    DOCKER_REGISTRY = "krishnasravi"            // DockerHub username or registry
-    GIT_CREDENTIALS_ID = "github-pat"           // GitHub credentials ID
-    APP_DIR = "app"                             // Subdirectory where app code resides
+    IMAGE_NAME = "kubernetes-demo"
+    DOCKER_REGISTRY = "krishnasravi"
+    GIT_CREDENTIALS_ID = "github-pat"
+    APP_DIR = "app"
   }
 
   stages {
@@ -54,6 +54,8 @@ pipeline {
           def namespace = params.BRANCH_NAME.toLowerCase()
           def deploymentFile = ""
           def kubeconfigCredentialId = ""
+          def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+          def imageTag = "${safeTag}-${BUILD_NUMBER}"
 
           switch (params.BRANCH_NAME) {
             case 'dev':
@@ -74,16 +76,16 @@ pipeline {
 
           withCredentials([file(credentialsId: kubeconfigCredentialId, variable: 'KUBECONFIG_FILE')]) {
             sh script: '''
-              export KUBECONFIG=$KUBECONFIG_FILE
-              sed -i "s|image: .*|image: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|" ${DEPLOYMENT_FILE}
-              kubectl apply --insecure-skip-tls-verify -f ${DEPLOYMENT_FILE}
-              kubectl rollout status deployment/${IMAGE_NAME} -n ${NAMESPACE}
+              export KUBECONFIG="$KUBECONFIG_FILE"
+              sed -i "s|image: .*|image: $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$DEPLOYMENT_FILE"
+              kubectl apply --insecure-skip-tls-verify -f "$DEPLOYMENT_FILE"
+              kubectl rollout status deployment/"$IMAGE_NAME" -n "$NAMESPACE"
             ''',
             env: [
               "KUBECONFIG_FILE=${KUBECONFIG_FILE}",
               "DOCKER_REGISTRY=${DOCKER_REGISTRY}",
               "IMAGE_NAME=${IMAGE_NAME}",
-              "IMAGE_TAG=${env.IMAGE_TAG}",
+              "IMAGE_TAG=${imageTag}",
               "DEPLOYMENT_FILE=${deploymentFile}",
               "NAMESPACE=${namespace}"
             ]
