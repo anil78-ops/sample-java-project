@@ -86,4 +86,20 @@ pipeline {
       }
     }
   }
+
+  post {
+    always {
+      script {
+        def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+        def imageTag = "${safeTag}-${BUILD_NUMBER}"
+
+        echo "🧹 Running cleanup..."
+        sh """
+          docker rmi ${DOCKER_REGISTRY}/${IMAGE_NAME}:${imageTag} || true
+          docker image prune -f || true
+        """
+        cleanWs()
+      }
+    }
+  }
 }
