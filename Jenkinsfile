@@ -74,21 +74,13 @@ pipeline {
               error "Unsupported branch for deployment: ${params.BRANCH_NAME}"
           }
 
-          withCredentials([file(credentialsId: kubeconfigCredentialId, variable: 'KUBECONFIG_FILE')]) {
-            sh script: '''
-              export KUBECONFIG="$KUBECONFIG_FILE"
-              sed -i "s|image: .*|image: $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$DEPLOYMENT_FILE"
-              kubectl apply --insecure-skip-tls-verify -f "$DEPLOYMENT_FILE"
-              kubectl rollout status deployment/"$IMAGE_NAME" -n "$NAMESPACE"
-            ''',
-            env: [
-              "KUBECONFIG_FILE=${KUBECONFIG_FILE}",
-              "DOCKER_REGISTRY=${DOCKER_REGISTRY}",
-              "IMAGE_NAME=${IMAGE_NAME}",
-              "IMAGE_TAG=${imageTag}",
-              "DEPLOYMENT_FILE=${deploymentFile}",
-              "NAMESPACE=${namespace}"
-            ]
+          withCredentials([file(credentialsId: kubeconfigCredentialId, variable: 'KCFG')]) {
+            sh """
+              export KUBECONFIG=${KCFG}
+              sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${imageTag}|' ${deploymentFile}
+              kubectl apply --insecure-skip-tls-verify -f ${deploymentFile}
+              kubectl rollout status deployment/${IMAGE_NAME} -n ${namespace}
+            """
           }
         }
       }
