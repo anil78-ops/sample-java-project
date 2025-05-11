@@ -44,4 +44,3 @@ spec:
   - protocol: TCP
     port: 80 # The port exposed by the Service
     targetPort: 8080 # The port inside the container
-  type: LoadBalancer # Use ClusterIP (default), NodePort, or LoadBalancer
