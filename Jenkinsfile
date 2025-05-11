@@ -8,8 +8,8 @@ pipeline {
   environment {
     IMAGE_NAME = "kubernetes-demo"              // Application name
     DOCKER_REGISTRY = "krishnasravi"            // DockerHub username or registry
-    GIT_CREDENTIALS_ID = "github-pat"
-    APP_DIR = "app"// GitHub credentials ID in Jenkins
+    GIT_CREDENTIALS_ID = "github-pat"           // GitHub credentials ID
+    APP_DIR = "app"                             // Subdirectory where app code resides
   }
 
   stages {
@@ -31,17 +31,18 @@ pipeline {
 
     stage('Docker Build and Push') {
       steps {
-        dir("${APP_DIR}")
-        script {
-          def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
-          def imageTag = "${safeTag}-${BUILD_NUMBER}"
-          env.IMAGE_TAG = imageTag
+        dir("${APP_DIR}") {
+          script {
+            def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+            def imageTag = "${safeTag}-${BUILD_NUMBER}"
+            env.IMAGE_TAG = imageTag
 
-          withDockerRegistry(credentialsId: 'docker-cred-id', url: '') {
-            sh """
-              docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
-              docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-            """
+            withDockerRegistry(credentialsId: 'docker-cred-id', url: '') {
+              sh """
+                docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+              """
+            }
           }
         }
       }
