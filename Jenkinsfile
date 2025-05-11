@@ -66,7 +66,7 @@ pipeline {
       steps {
         script {
           def branch = env.ACTUAL_BRANCH
-          def namespace = ['dev': 'dev', 'uat': 'uat', 'main': 'master'][branch]
+          def namespace = ['dev': 'dev', 'uat': 'uat', 'main': 'prod'][branch]
           def deploymentFile = ""
           def kubeconfigCredentialId = ""
           def safeTag = branch.replaceAll('/', '-')
