@@ -58,15 +58,15 @@ pipeline {
           switch (params.BRANCH_NAME) {
             case 'dev':
               kubeconfigCredentialId = 'kubeconfig-dev'
-              deploymentFile = 'k8s/dev/dev-deployment.yaml'
+              deploymentFile = 'manifests/dev/dev-deployment.yaml'
               break
             case 'uat':
               kubeconfigCredentialId = 'kubeconfig-uat'
-              deploymentFile = 'k8s/uat/uat-deployment.yaml'
+              deploymentFile = 'manifests/uat/uat-deployment.yaml'
               break
             case 'main':
               kubeconfigCredentialId = 'kubeconfig-prod'
-              deploymentFile = 'k8s/prod/prod-deployment.yaml'
+              deploymentFile = 'manifests/prod/prod-deployment.yaml'
               break
             default:
               error "Unsupported branch for deployment: ${params.BRANCH_NAME}"
