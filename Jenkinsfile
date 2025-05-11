@@ -8,7 +8,8 @@ pipeline {
   environment {
     IMAGE_NAME = "kubernetes-demo"              // Application name
     DOCKER_REGISTRY = "krishnasravi"            // DockerHub username or registry
-    GIT_CREDENTIALS_ID = "github-pat"           // GitHub credentials ID in Jenkins
+    GIT_CREDENTIALS_ID = "github-pat"
+    APP_DIR = "app"// GitHub credentials ID in Jenkins
   }
 
   stages {
@@ -22,12 +23,15 @@ pipeline {
 
     stage('Maven Build') {
       steps {
-        sh 'mvn clean package -DskipTests'
+        dir("${APP_DIR}") {
+          sh 'mvn clean package -DskipTests'
+        }
       }
     }
 
     stage('Docker Build and Push') {
       steps {
+        dir("${APP_DIR}")
         script {
           def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
           def imageTag = "${safeTag}-${BUILD_NUMBER}"
