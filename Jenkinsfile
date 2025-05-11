@@ -22,6 +22,9 @@ pipeline {
     }
 
     stage('Maven Build') {
+      when {
+        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+      }
       steps {
         dir("${APP_DIR}") {
           sh 'mvn clean package -DskipTests'
@@ -30,6 +33,9 @@ pipeline {
     }
 
     stage('Docker Build and Push') {
+      when {
+        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+      }
       steps {
         dir("${APP_DIR}") {
           script {
@@ -49,6 +55,9 @@ pipeline {
     }
 
     stage('Kubernetes Deploy') {
+      when {
+        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+      }
       steps {
         script {
           def namespace = params.BRANCH_NAME.toLowerCase()
