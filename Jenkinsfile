@@ -1,10 +1,6 @@
 pipeline {
   agent any
 
-  parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'dev', description: 'Git branch to build and deploy')
-  }
-
   environment {
     IMAGE_NAME = "kubernetes-demo"
     DOCKER_REGISTRY = "krishnasravi"
@@ -13,9 +9,18 @@ pipeline {
   }
 
   stages {
+    stage('Determine Branch') {
+      steps {
+        script {
+          env.ACTUAL_BRANCH = env.BRANCH_NAME ?: env.GIT_BRANCH?.replaceFirst(/^origin\//, '') ?: 'dev'
+          echo "🔀 Detected branch: ${env.ACTUAL_BRANCH}"
+        }
+      }
+    }
+
     stage('Clone Repository') {
       steps {
-        git branch: "${params.BRANCH_NAME}",
+        git branch: "${env.ACTUAL_BRANCH}",
             url: 'https://github.com/krishnasravi/kubernetes-demo.git',
             credentialsId: "${GIT_CREDENTIALS_ID}"
       }
@@ -23,7 +28,7 @@ pipeline {
 
     stage('Maven Build') {
       when {
-        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+        expression { return ['dev', 'uat', 'main'].contains(env.ACTUAL_BRANCH) }
       }
       steps {
         dir("${APP_DIR}") {
@@ -34,12 +39,12 @@ pipeline {
 
     stage('Docker Build and Push') {
       when {
-        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+        expression { return ['dev', 'uat', 'main'].contains(env.ACTUAL_BRANCH) }
       }
       steps {
         dir("${APP_DIR}") {
           script {
-            def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+            def safeTag = env.ACTUAL_BRANCH.replaceAll('/', '-')
             def imageTag = "${safeTag}-${BUILD_NUMBER}"
             env.IMAGE_TAG = imageTag
 
@@ -56,17 +61,18 @@ pipeline {
 
     stage('Kubernetes Deploy') {
       when {
-        expression { return ['dev', 'uat', 'main'].contains(params.BRANCH_NAME) }
+        expression { return ['dev', 'uat', 'main'].contains(env.ACTUAL_BRANCH) }
       }
       steps {
         script {
-          def namespace = params.BRANCH_NAME.toLowerCase()
+          def branch = env.ACTUAL_BRANCH
+          def namespace = ['dev': 'dev', 'uat': 'uat', 'main': 'master'][branch]
           def deploymentFile = ""
           def kubeconfigCredentialId = ""
-          def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+          def safeTag = branch.replaceAll('/', '-')
           def imageTag = "${safeTag}-${BUILD_NUMBER}"
 
-          switch (params.BRANCH_NAME) {
+          switch (branch) {
             case 'dev':
               kubeconfigCredentialId = 'kubeconfig-dev'
               deploymentFile = 'manifests/dev/dev-deployment.yaml'
@@ -80,7 +86,7 @@ pipeline {
               deploymentFile = 'manifests/prod/prod-deployment.yaml'
               break
             default:
-              error "Unsupported branch for deployment: ${params.BRANCH_NAME}"
+              error "Unsupported branch for deployment: ${branch}"
           }
 
           withCredentials([file(credentialsId: kubeconfigCredentialId, variable: 'KCFG')]) {
@@ -99,7 +105,7 @@ pipeline {
   post {
     always {
       script {
-        def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+        def safeTag = env.ACTUAL_BRANCH.replaceAll('/', '-')
         def imageTag = "${safeTag}-${BUILD_NUMBER}"
 
         echo "🧹 Running cleanup..."
