@@ -1,16 +1,22 @@
 pipeline {
   agent any
 
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'dev', description: 'Git branch to build and deploy')
+  }
+
   environment {
-    IMAGE_NAME = "kubernetes-demo" // Replace with your app name
-    DOCKER_REGISTRY = "krishnasravi" // Replace with your DockerHub user/org
-    GIT_CREDENTIALS_ID = "github-pat" // Jenkins Git credentials ID
+    IMAGE_NAME = "kubernetes-demo"              // Application name
+    DOCKER_REGISTRY = "krishnasravi"            // DockerHub username or registry
+    GIT_CREDENTIALS_ID = "github-pat"           // GitHub credentials ID in Jenkins
   }
 
   stages {
     stage('Clone Repository') {
       steps {
-        git branch: "${env.BRANCH_NAME}", url: 'https://github.com/krishnasravi/kubernetes-demo.git', credentialsId: "${GIT_CREDENTIALS_ID}"
+        git branch: "${params.BRANCH_NAME}",
+            url: 'https://github.com/krishnasravi/kubernetes-demo.git',
+            credentialsId: "${GIT_CREDENTIALS_ID}"
       }
     }
 
@@ -23,13 +29,16 @@ pipeline {
     stage('Docker Build and Push') {
       steps {
         script {
-          def tag = BRANCH_NAME.replaceAll("/", "-")
-          env.IMAGE_TAG = "${tag}-${BUILD_NUMBER}"
-          withDockerRegistry([credentialsId: 'docker-cred-id', url: 'https://index.docker.io/v1/'])
-          sh """
-            docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
-            docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-          """
+          def safeTag = params.BRANCH_NAME.replaceAll('/', '-')
+          def imageTag = "${safeTag}-${BUILD_NUMBER}"
+          env.IMAGE_TAG = imageTag
+
+          withDockerRegistry(credentialsId: 'docker-cred-id', url: '') {
+            sh """
+              docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+              docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+            """
+          }
         }
       }
     }
@@ -37,30 +46,36 @@ pipeline {
     stage('Kubernetes Deploy') {
       steps {
         script {
-          def kubeconfig = ""
+          def namespace = params.BRANCH_NAME.toLowerCase()
           def deploymentFile = ""
-          def namespace = BRANCH_NAME.toLowerCase() 
+          def kubeconfigCredentialId = ""
 
-          if (env.BRANCH_NAME == 'dev') {
-            kubeconfig = credentials('kubeconfig-dev')
-            deploymentFile = 'k8s/dev/dev-deployment.yaml'
-          } else if (env.BRANCH_NAME == 'uat') {
-            kubeconfig = credentials('kubeconfig-uat')
-            deploymentFile = 'k8s/uat/uat-deployment.yaml'
-          } else if (env.BRANCH_NAME == 'main') {
-            kubeconfig = credentials('kubeconfig-prod')
-            deploymentFile = 'k8s/prod/prod-deployment.yaml'
-          } else {
-            error "Unsupported branch for deployment: ${BRANCH_NAME}"
+          switch (params.BRANCH_NAME) {
+            case 'dev':
+              kubeconfigCredentialId = 'kubeconfig-dev'
+              deploymentFile = 'k8s/dev/dev-deployment.yaml'
+              break
+            case 'uat':
+              kubeconfigCredentialId = 'kubeconfig-uat'
+              deploymentFile = 'k8s/uat/uat-deployment.yaml'
+              break
+            case 'main':
+              kubeconfigCredentialId = 'kubeconfig-prod'
+              deploymentFile = 'k8s/prod/prod-deployment.yaml'
+              break
+            default:
+              error "Unsupported branch for deployment: ${params.BRANCH_NAME}"
           }
 
-          // Update deployment file with new image tag
-          sh """
-            sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|' ${deploymentFile}
-            export KUBECONFIG=${kubeconfig}
-            kubectl apply -f ${deploymentFile}
-            kubectl rollout status deployment/${IMAGE_NAME} -n ${namespace}
-          """
+          // Inject kubeconfig content as a file
+          withCredentials([file(credentialsId: kubeconfigCredentialId, variable: 'KUBECONFIG_FILE')]) {
+            sh """
+              sed -i 's|image: .*|image: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|' ${deploymentFile}
+              export KUBECONFIG=$KUBECONFIG_FILE
+              kubectl apply -f ${deploymentFile}
+              kubectl rollout status deployment/${IMAGE_NAME} -n ${namespace}
+            """
+          }
         }
       }
     }
