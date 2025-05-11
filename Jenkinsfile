@@ -10,7 +10,7 @@ pipeline {
   stages {
     stage('Clone Repository') {
       steps {
-        git branch: "${env.BRANCH_NAME}", url: '"https://github.com/krishnasravi/kubernetes-demo.git"', credentialsId: "${GIT_CREDENTIALS_ID}"
+        git branch: "${env.BRANCH_NAME}", url: 'https://github.com/krishnasravi/kubernetes-demo.git', credentialsId: "${GIT_CREDENTIALS_ID}"
       }
     }
 
